@@ -1,0 +1,17 @@
+# environments & build outputs
+.venv/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+
+# generated sample data (recreate with: python examples/make_examples.py)
+examples/*.fits
+
+# icon build intermediates
+packaging/*.iconset/
+
+# local tooling
+.claude/
+.DS_Store

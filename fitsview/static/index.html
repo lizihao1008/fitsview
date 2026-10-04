@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fitsview</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/vendor/plotly.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◎</span> fitsview</div>
+  <form id="open-form" class="pathbar">
+    <input id="path-input" type="text" spellcheck="false" placeholder="/path/to/file.fits — or drop a file anywhere">
+    <button type="submit" class="btn primary">Open</button>
+    <button type="button" id="browse-btn" class="btn" hidden>Browse…</button>
+  </form>
+  <button id="theme-btn" class="btn ghost" title="Toggle light / dark">◐</button>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="side-head">
+      <button id="dir-up" class="btn ghost small" title="Parent directory">↑</button>
+      <div id="dir-path" class="dir-path"></div>
+    </div>
+    <label class="check small"><input id="show-all" type="checkbox"> show non-FITS files</label>
+    <ul id="dir-list" class="dir-list"></ul>
+  </aside>
+
+  <main class="main">
+    <nav id="file-tabs" class="file-tabs"></nav>
+
+    <section id="welcome" class="welcome">
+      <h1>Open a FITS file</h1>
+      <p>Pick a file in the browser on the left, type a path above, or drag a file onto this window.</p>
+      <p class="muted">Images open in DS9 · tables and spectra preview right here.</p>
+    </section>
+
+    <section id="file-view" hidden>
+      <div class="file-meta" id="file-meta"></div>
+      <div class="hdu-wrap">
+        <table class="hdu-table">
+          <thead><tr><th>#</th><th>Extension</th><th class="c-opt">Type</th><th>Content</th><th>Dimensions</th><th class="c-opt">Cards</th><th></th></tr></thead>
+          <tbody id="hdu-body"></tbody>
+        </table>
+      </div>
+
+      <div class="detail" id="detail">
+        <div class="detail-head">
+          <div id="detail-title" class="detail-title"></div>
+          <div class="tabs" id="tabs">
+            <button data-tab="header">Header</button>
+            <button data-tab="data">Data</button>
+            <button data-tab="plot">Plot</button>
+          </div>
+        </div>
+        <div id="pane" class="pane"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="drop-overlay" class="drop-overlay" hidden><div>Drop FITS file to open</div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
