@@ -30,7 +30,7 @@ app = BUNDLE(
     name="FITSView.app",
     icon=str(ROOT / "packaging" / "FITSView.icns"),
     bundle_identifier="io.github.fitsview",
-    version="0.2.0",
+    version="0.2.1",
     info_plist={
         "CFBundleDisplayName": "FITSView",
         "NSHighResolutionCapable": True,

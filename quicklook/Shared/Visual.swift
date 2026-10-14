@@ -23,11 +23,18 @@ struct Visual {
 }
 
 extension FITSFile {
-    /// Most informative visual in the file: first image/cube, else event list, else spectrum.
+    /// Most informative visual in the file: a science image/cube, else event list, else spectrum.
     func heroVisual(maxSize: Int) -> Visual? {
         let kinds = hdus.map { ($0, kind($0)) }
-        if let (h, _) = kinds.first(where: { $0.1 == .image || $0.1 == .cube }) {
-            return imageVisual(h, maxSize: maxSize)
+        // Science-looking images first; weights, masks, covariance etc. last
+        // (e.g. grizli *.full.fits starts with a mostly-zero COVAR matrix before DSCI).
+        let images = kinds.filter { $0.1 == .image || $0.1 == .cube }.map(\.0)
+            .sorted { (Self.imageRank($0), $0.index) < (Self.imageRank($1), $1.index) }
+        var fallback: Visual?
+        for h in images.prefix(8) {
+            guard let v = imageVisual(h, maxSize: maxSize) else { continue }
+            if Self.isInformative(v) { return v }
+            fallback = fallback ?? v
         }
         // an event list says more than the PHA spectrum that often rides along with it
         if let (h, _) = kinds.first(where: { $0.1 == .events }), let v = eventsVisual(h, bins: min(512, maxSize)) {
@@ -36,7 +43,29 @@ extension FITSFile {
         for (h, k) in kinds where [.spectrum, .spectra, .spectrumTable].contains(k) {
             if let v = spectrumVisual(h) { return v }
         }
-        return nil
+        return fallback
+    }
+
+    private static let scienceNames: Set<String> = ["SCI", "DSCI", "IMAGE", "IMG", "DATA", "FLUX", "PRIMARY", "INTENSITY"]
+    private static let auxiliaryTokens = ["COV", "WHT", "WEIGHT", "IVAR", "VAR", "ERR", "UNC", "DQ", "MASK", "FLAG",
+                                          "SEG", "PSF", "CONTAM", "EXP", "CTX", "BKG", "SKY", "NOISE", "RMS", "MODEL"]
+
+    /// 0 = science extension name, 1 = unknown, 2 = auxiliary (weights, masks, errors, ...)
+    static func imageRank(_ h: HDU) -> Int {
+        let name = h.name.uppercased()
+        if scienceNames.contains(name) { return 0 }
+        return auxiliaryTokens.contains { name.contains($0) } ? 2 : 1
+    }
+
+    /// False for planes that are (almost) all one value or all NaN: masks, empty
+    /// continuum models, sparse matrices — they render as a flat square.
+    static func isInformative(_ v: Visual) -> Bool {
+        guard case .image(let p, _, _, _) = v.content else { return true }
+        let finite = p.pixels.filter(\.isFinite)
+        guard finite.count >= max(4, p.pixels.count / 100) else { return false }
+        let median = finite.sorted()[finite.count / 2]
+        let differing = finite.lazy.filter { $0 != median }.count
+        return Double(differing) > 0.2 * Double(finite.count)
     }
 
     func label(_ h: HDU) -> String {

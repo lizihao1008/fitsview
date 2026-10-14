@@ -16,6 +16,16 @@ cp -R build/quicklook/FITSPreview.appex build/quicklook/FITSThumbnail.appex $APP
 codesign --force --sign - --timestamp=none $APP
 codesign --verify --strict $APP
 
+# PyInstaller deleted and recreated the bundle, which unregisters its Quick Look
+# extensions. Register this build, unless an installed copy in /Applications is in use.
+LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+if [[ -d /Applications/FITSView.app ]]; then
+  echo "note: /Applications/FITSView.app provides Quick Look; reinstall it to test this build's extensions"
+else
+  $LSREG -f -R "$PWD/$APP"
+  # PlugInKit picks extensions up lazily (and sometimes not at all) — add them explicitly
+  pluginkit -a "$PWD/$APP/Contents/PlugIns/FITSPreview.appex" "$PWD/$APP/Contents/PlugIns/FITSThumbnail.appex"
+fi
 # an already-running extension process would keep serving the old code
 pkill -f "FITSView.app/Contents/PlugIns/FITS(Preview|Thumbnail).appex" || true
 qlmanage -r cache >/dev/null 2>&1 || true
