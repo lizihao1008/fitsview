@@ -9,8 +9,12 @@ struct PreviewDocument {
 }
 
 enum PreviewBuilder {
-    static let maxHDUSections = 60
-    static let maxExtraImages = 8
+    static let maxHDUSections = 150
+    // Per-HDU images are limited by work, not count: grizli stack files have dozens of
+    // tiny 2-D spectra, while a handful of 8k mosaics is already expensive.
+    static let imagePixelBudget = 6_000_000
+    static let imageTimeBudget: TimeInterval = 2.5
+    static let smallImageSize = 340   // CSS px; small images are enlarged up to this
     static let maxCards = 2000
     static let previewRows = 25
     static let previewCols = 40
@@ -40,14 +44,21 @@ enum PreviewBuilder {
         body += "</tbody></table>"
 
         // per-HDU sections
-        var extraImages = 0
+        var pixelsUsed = 0
+        let started = Date()
         for (h, k) in zip(f.hdus, kinds).prefix(maxHDUSections) {
             body += "<section class=\"hdu\"><h2>HDU \(h.index) · \(esc(h.name.isEmpty ? "—" : h.name)) \(badge(k)) <span class=\"dims\">\(esc(h.typeName)) · \(esc(h.dimsText))</span></h2>"
             if hero?.hdu != h.index {
-                if (k == .image || k == .cube) && extraImages < maxExtraImages, let v = f.imageVisual(h, maxSize: 480) {
-                    extraImages += 1
-                    body += "<figure class=\"small\">" + visualHTML(v, name: "hdu\(h.index).png", attachments: &attachments, cls: "small-img")
-                    body += "<figcaption>\(esc(v.caption))</figcaption></figure>"
+                if k == .image || k == .cube {
+                    let withinBudget = pixelsUsed < imagePixelBudget && Date().timeIntervalSince(started) < imageTimeBudget
+                    if withinBudget, let v = f.imageVisual(h, maxSize: 480) {
+                        if case .image(let p, _, _, _) = v.content { pixelsUsed += p.width * p.height }
+                        body += "<figure class=\"small\">" + visualHTML(v, name: "hdu\(h.index).png", attachments: &attachments,
+                                                                         cls: "small-img", enlargeTo: smallImageSize)
+                        body += "<figcaption>\(esc(v.caption))</figcaption></figure>"
+                    } else if !withinBudget {
+                        body += "<p class=\"note\">Image not drawn (preview size limit reached) — open the file in FITSView.</p>"
+                    }
                 } else if [.spectrum, .spectra, .spectrumTable].contains(k), let v = f.spectrumVisual(h) {
                     body += "<figure>" + visualHTML(v, name: "", attachments: &attachments, cls: "") + "</figure>"
                 }
@@ -73,12 +84,15 @@ enum PreviewBuilder {
 
     // MARK: pieces
 
-    private static func visualHTML(_ v: Visual, name: String, attachments: inout [String: Data], cls: String) -> String {
+    private static func visualHTML(_ v: Visual, name: String, attachments: inout [String: Data], cls: String,
+                                   enlargeTo: Int? = nil) -> String {
         switch v.content {
         case .image(let p, let z1, let z2, let cmap):
             guard let img = makeCGImage(p, z1: z1, z2: z2, colormap: cmap), let png = pngData(img) else { return "" }
             attachments[name] = png
-            return "<img class=\"\(cls)\" src=\"cid:\(name)\" width=\"\(p.width)\" height=\"\(p.height)\" alt=\"\">"
+            // whole-number enlargement keeps pixels square and crisp (image-rendering: pixelated)
+            let k = enlargeTo.map { max(1, $0 / max(p.width, p.height)) } ?? 1
+            return "<img class=\"\(cls)\" src=\"cid:\(name)\" width=\"\(p.width * k)\" height=\"\(p.height * k)\" alt=\"\">"
         case .spectrum(let s):
             return "<div class=\"svgwrap\">" + spectrumSVG(s) + "</div>"
         }
@@ -193,7 +207,7 @@ enum PreviewBuilder {
     background:color-mix(in srgb,var(--k) 14%,transparent);vertical-align:1px}
     .k-image{--k:var(--k-image)}.k-cube{--k:var(--k-cube)}.k-spec{--k:var(--k-spec)}.k-table{--k:var(--k-table)}.k-events{--k:var(--k-events)}.k-empty{--k:var(--k-empty)}
     .hdu{border-top:1px solid var(--border);padding-top:14px;margin-top:16px}.dims{font-weight:400;font-size:12px;margin-left:6px}
-    figure{margin:0 0 10px}figure.small{max-width:340px}figcaption{font-size:12px;margin-top:4px}
+    figure{margin:0 0 10px}figure.small{max-width:480px}figcaption{font-size:12px;margin-top:4px}
     .stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 10px}.stats div{display:flex;gap:6px}
     .stats dt{color:var(--muted)}.stats dd{margin:0}
     details{margin:6px 0}summary{cursor:pointer;color:var(--accent);font-weight:500;padding:2px 0}

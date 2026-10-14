@@ -81,6 +81,10 @@ extension FITSFile {
         let (z1, z2) = zscale(p.pixels)
         var caption = "\(label(h)) · \(ax.map(String.init).joined(separator: " × "))"
         if planes > 1 { caption += " · plane \(plane + 1) of \(planes)" }
+        // distinguishes repeated SCI blocks, e.g. one per grism/filter and PA in grizli stacks
+        let hd = h.header
+        if let g = hd.string("GRISM") ?? hd.string("FILTER"), !g.isEmpty { caption += " · \(g)" }
+        if let pa = hd.double("PA") { caption += " · PA \(formatNumber(pa))" }
         return Visual(hdu: h.index, caption: caption + " · zscale", content: .image(p, z1: z1, z2: z2, colormap: .gray))
     }
 
