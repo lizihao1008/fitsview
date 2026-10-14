@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fitsview"
-version = "0.1.0"
+version = "0.2.0"
 description = "Browser-based FITS structure viewer (headers, tables, spectra) with DS9 hand-off"
 requires-python = ">=3.9"
 dependencies = ["astropy>=5.0", "numpy", "flask>=2.2"]
